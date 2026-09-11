@@ -55,6 +55,57 @@ This guide includes configuration for the following accelerators:
 | AMD GPU             | `modelserver/amd/vllm/`    | AMD GPU, community contributed                           |
 | Intel XPU           | `modelserver/xpu/vllm/`    | Intel Data Center GPU Max 1550+, community contributed   |
 | Intel XPU + RDMA    | `modelserver/xpu/vllm-rdma/` | Intel XPU with RDMA via UCX (`ib,rc,ze_copy`), requires RDMA DRA driver |
+| Rebellions NPU      | `modelserver/npu/vllm/`  | Rebellions NPUs with RoCE via DRA, community contributed. See [Rebellions NPU Configuration](#rebellions-npu-configuration) |
+| Rebellions NPU + NUMA | `modelserver/npu/vllm-numa/` | The same overlay with the NPUs and the RoCE VF pinned to one NUMA node. Required on bare metal, unsatisfiable under VM passthrough |
+
+#### Rebellions NPU Configuration
+
+The Rebellions configuration serves [MiniMax-M2.7](https://huggingface.co/MiniMaxAI/MiniMax-M2.7)
+with heterogeneous parallelism across the two roles:
+
+| Parameter | Prefill | Decode |
+| --- | --- | --- |
+| Parallelism | Pipeline, 4 stages | Data, 4 ranks, expert parallel on |
+| NPUs | 4 | 4 |
+| API servers per pod | 1 (port 8000) | 4 (ports 8200-8203, fronted by the sidecar on 8000-8003) |
+| `--num-gpu-blocks-override` | 200 | 50 |
+| `--max-num-seqs` | 4 | 4 |
+
+Both roles share `--max-model-len=204800`, `--block-size=4096`, `--kv-cache-dtype=fp8`, automatic
+prefix caching, and the on-device sampler. KV transfer uses NIXL with `kv_buffer_device=rbln`.
+Expert parallelism is on for decode only: a pipeline-parallel prefill rank holds one stage, so
+there is no expert group to split.
+
+Because the decode role runs one API server per data-parallel rank, the EPP must be given every
+rank port. Layer [`router/npu.values.yaml`](./router/npu.values.yaml) over the guide's own
+values file when installing the router.
+
+**NUMA alignment — pick the overlay that matches the host.** Each role claims four NPUs and one
+RoCE VF, and NIXL moves KV blocks over that VF. Whether those devices must be pinned to one NUMA
+node depends on how the host exposes the NPUs, and the two cases fail in opposite directions:
+
+| Host | Overlay | What happens with the other one |
+| --- | --- | --- |
+| Bare metal, advertising `resource.kubernetes.io/numaNode` | `modelserver/npu/vllm-numa/` | A VF on one NUMA node with NPUs on another passes scheduling and fails later at transfer time: `no usable data-plane RoCE NIC on numa=1` |
+| NPUs passed through to a VM, no `numaNode` attribute | `modelserver/npu/vllm/` | A constraint on an attribute the device does not carry can never be satisfied, so every pod stays Pending on `0/3 nodes are available: 1 cannot allocate all claims` |
+
+So the constraint lives in its own overlay rather than the shared one. On bare metal, also confirm
+the host can actually place four NPUs and a VF on a single NUMA node before deploying — the
+constraint requires all five devices in a role to agree.
+
+Neither the DRA allocation nor the NIXL transfer can be checked by a server dry-run against a
+cluster without these DeviceClasses. Both need a run on the real hardware.
+
+**Cluster prerequisites** beyond the [RBLN NPU Operator](https://docs.rbln.ai/latest/software/system_management/kubernetes/about_npu_operator.html):
+
+* A network DRA driver publishing a `dranet` DeviceClass, so each role can claim a RoCE VF
+  alongside its NPUs. The claim requests the `rdma` profile; without an IPv4 on that VF the
+  NIXL side channel cannot bind.
+* Kubernetes 1.34 or later for the `resource.k8s.io/v1` DRA APIs.
+
+`peakPrefillThroughput` in the router config is the reference NVIDIA measurement and gates
+prefix-affinity routing, so re-measure it on this hardware with
+[`calibrate.sh`](../recipes/router/calibration/) before relying on the gate.
 
 > [!NOTE]
 > Some hardware variants use reduced configurations (fewer replicas, smaller models) to enable CI testing for compatibility and regression checks. These configurations are maintained by their respective hardware vendors and are not guaranteed as production-ready examples. Users deploying on non-default hardware should review and adjust the configurations for their environment.
