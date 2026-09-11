@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../vllm
+
+# Binds the four NPUs and the RoCE VF of one claim to the same NUMA node. Apply this
+# overlay instead of ../vllm on bare metal; apply ../vllm on hosts that pass the NPUs
+# through to a VM. The two cases fail in opposite directions, so neither default is safe
+# for both — see Rebellions NPU Configuration in the guide README.
+patches:
+  - target:
+      kind: ResourceClaimTemplate
+      name: npu-prefill-claim
+    patch: |-
+      - op: add
+        path: /spec/spec/devices/constraints
+        value:
+          - requests: [npu, nic]
+            matchAttribute: resource.kubernetes.io/numaNode
+  - target:
+      kind: ResourceClaimTemplate
+      name: npu-decode-claim
+    patch: |-
+      - op: add
+        path: /spec/spec/devices/constraints
+        value:
+          - requests: [npu, nic]
+            matchAttribute: resource.kubernetes.io/numaNode
