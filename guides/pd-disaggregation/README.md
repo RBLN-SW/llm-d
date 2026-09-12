@@ -78,7 +78,7 @@ Expert parallelism is on for decode only: a pipeline-parallel prefill rank holds
 there is no expert group to split.
 
 Because the decode role runs one API server per data-parallel rank, the EPP must be given every
-rank port. Layer [`router/npu.values.yaml`](./router/npu.values.yaml) over the guide's own
+rank port. Layer [`router/npu.rbln.values.yaml`](./router/npu.rbln.values.yaml) over the guide's own
 values file when installing the router.
 
 **NUMA alignment — pick the overlay that matches the host.** Each role claims four NPUs and one
