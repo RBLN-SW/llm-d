@@ -1,5 +1,7 @@
 # Rebellions NPU overrides for the pd-disaggregation router. Layer this over
 # pd-disaggregation.values.yaml; everything not named here is inherited from it.
+# Named for the RBLN runtime rather than for NPUs in general, since the rank-to-port
+# layout below follows that runtime pinning a rank to a device.
 router:
   modelServers:
     # The decode role runs one API server per data-parallel rank behind the routing

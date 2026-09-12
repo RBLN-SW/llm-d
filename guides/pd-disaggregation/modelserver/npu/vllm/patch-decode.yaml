@@ -63,15 +63,12 @@ spec:
               set -euo pipefail
               COMMON=(
                 MiniMaxAI/MiniMax-M2.7
-                --served-model-name=MiniMaxAI/MiniMax-M2.7
                 --disable-access-log-for-endpoints=/health,/metrics,/v1/models
                 --data-parallel-size=4
                 --data-parallel-address="${POD_IP}"
                 --data-parallel-rpc-port=5555
                 --enable-expert-parallel
-                --max-model-len=204800
                 --block-size=4096
-                --enable-chunked-prefill
                 --max-num-batched-tokens=512
                 --enable-prefix-caching
                 --prefix-caching-hash-algo=sha256_cbor

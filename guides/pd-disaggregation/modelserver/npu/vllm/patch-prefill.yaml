@@ -34,14 +34,11 @@ spec:
           command: ["vllm", "serve"]
           args:
             - "MiniMaxAI/MiniMax-M2.7"
-            - "--served-model-name=MiniMaxAI/MiniMax-M2.7"
             - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
             # Pipeline parallelism, not data parallelism: one API server drives all four
             # NPUs, so this role keeps the single port the base declares.
             - "--pipeline-parallel-size=4"
-            - "--max-model-len=204800"
             - "--block-size=4096"
-            - "--enable-chunked-prefill"
             - "--max-num-batched-tokens=512"
             - "--enable-prefix-caching"
             - "--prefix-caching-hash-algo=sha256_cbor"
