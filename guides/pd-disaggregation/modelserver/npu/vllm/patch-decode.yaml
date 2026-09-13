@@ -3,9 +3,9 @@ kind: Deployment
 metadata:
   name: decode
 spec:
-  replicas: 1
-  # Rolling a single-replica NPU deployment leaves the old and the new pod both
-  # holding a claim, so neither becomes ready where there is no spare accelerator.
+  replicas: 2
+  # A rolling update keeps the old and the new pod of a replica both holding a
+  # claim, so neither becomes ready where there is no spare accelerator.
   strategy:
     type: Recreate
   # Matches the startupProbe budget below. Left at the 600s default, a compile
