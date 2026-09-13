@@ -58,7 +58,6 @@ This guide includes configuration for the following accelerators:
 | Intel XPU           | `modelserver/xpu/vllm/`    | Intel Data Center GPU Max 1550+, community contributed   |
 | Intel XPU + RDMA    | `modelserver/xpu/vllm-rdma/` | Intel XPU with RDMA via UCX (`ib,rc,ze_copy`), requires RDMA DRA driver |
 | Rebellions NPU      | `modelserver/npu/vllm/`  | Rebellions NPUs with RoCE via DRA, community contributed. See [Rebellions NPU Configuration](#rebellions-npu-configuration) |
-| Rebellions NPU + NUMA | `modelserver/npu/vllm-numa/` | The same overlay with the NPUs and the RoCE VF pinned to one NUMA node. Required on bare metal, unsatisfiable under VM passthrough |
 
 #### Rebellions NPU Configuration
 
@@ -82,18 +81,15 @@ Because the decode role runs one API server per data-parallel rank, the EPP must
 rank port. Layer [`router/npu.rbln.values.yaml`](./router/npu.rbln.values.yaml) over the guide's own
 values file when installing the router.
 
-**NUMA alignment — pick the overlay that matches the host.** Each role claims four NPUs and one
-RoCE VF, and NIXL moves KV blocks over that VF. Whether those devices must be pinned to one NUMA
-node depends on how the host exposes the NPUs, and the two cases fail in opposite directions:
+**NUMA alignment.** Each role claims four NPUs and one RoCE VF, and NIXL moves KV blocks over
+that VF. The claim constrains all five devices to one NUMA node on
+`resource.kubernetes.io/numaNode`, which both the NPU driver and dranet advertise. Without that
+constraint the scheduler may pair a NUMA-1 NPU with a NUMA-0 VF: the pods reach ready and the
+transfer is what fails, with `no usable data-plane RoCE NIC on numa=1`.
 
-| Host | Overlay | What happens with the other one |
-| --- | --- | --- |
-| Bare metal, advertising `resource.kubernetes.io/numaNode` | `modelserver/npu/vllm-numa/` | A VF on one NUMA node with NPUs on another passes scheduling and fails later at transfer time: `no usable data-plane RoCE NIC on numa=1` |
-| NPUs passed through to a VM, no `numaNode` attribute | `modelserver/npu/vllm/` | A constraint on an attribute the device does not carry can never be satisfied, so every pod stays Pending on `0/3 nodes are available: 1 cannot allocate all claims` |
-
-So the constraint lives in its own overlay rather than the shared one. On bare metal, also confirm
-the host can actually place four NPUs and a VF on a single NUMA node before deploying — the
-constraint requires all five devices in a role to agree.
+Confirm the host can place four NPUs and a VF on a single NUMA node before deploying — the
+constraint requires all five devices in a role to agree, and a pod whose node cannot supply
+them stays Pending on `0/3 nodes are available: 1 cannot allocate all claims`.
 
 Neither the DRA allocation nor the NIXL transfer can be checked by a server dry-run against a
 cluster without these DeviceClasses. Both need a run on the real hardware.

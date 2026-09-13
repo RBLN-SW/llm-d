@@ -32,6 +32,12 @@ spec:
             selectors:
               - cel:
                   expression: device.attributes["dra.net"].rdma
+      # The NPUs and the VF must land on one NUMA node. Left unconstrained the scheduler
+      # may pair a numa1 NPU with a numa0 VF, which passes scheduling and only fails once
+      # the transfer starts: no usable data-plane RoCE NIC on numa=1.
+      constraints:
+        - requests: [npu, nic]
+          matchAttribute: resource.kubernetes.io/numaNode
 ---
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
@@ -64,3 +70,9 @@ spec:
             selectors:
               - cel:
                   expression: device.attributes["dra.net"].rdma
+      # The NPUs and the VF must land on one NUMA node. Left unconstrained the scheduler
+      # may pair a numa1 NPU with a numa0 VF, which passes scheduling and only fails once
+      # the transfer starts: no usable data-plane RoCE NIC on numa=1.
+      constraints:
+        - requests: [npu, nic]
+          matchAttribute: resource.kubernetes.io/numaNode
