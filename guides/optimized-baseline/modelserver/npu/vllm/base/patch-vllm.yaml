@@ -23,19 +23,17 @@ spec:
           command: ["vllm", "serve"]
           args:
             - "openai/gpt-oss-120b"
+            # `auto` takes the optimum model path for this model.
             - "--model-impl=vllm"
             - "--enable-auto-tool-choice"
             - "--tool-call-parser=openai"
             - "--reasoning-parser=openai_gptoss"
             - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
             - "--distributed-executor-backend=mp"
-            - "--trust-remote-code"
             - "--block-size=4096"
-            - "--max-model-len=131072"
             # Prefix caching stays on: the runtime reuses prefixes in sub-blocks of this
             # size, sliding-window layers included.
             - "--max-num-batched-tokens=512"
-            - "--max-num-seqs=1"
           env:
             - name: HF_TOKEN
               valueFrom:
