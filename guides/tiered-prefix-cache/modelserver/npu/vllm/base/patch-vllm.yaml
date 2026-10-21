@@ -19,26 +19,20 @@ spec:
       containers:
         - name: modelserver
           # vLLM runs one API server per data-parallel rank and hands rank i its own
-          # NPU; the external load balancer mode gives each rank a port from --port
+          # NPU; the external load balancer mode gives each rank a port from 8000
           # upward, and the router addresses every rank as its own endpoint.
           command: ["vllm", "serve"]
           args:
             - "MiniMaxAI/MiniMax-M2.7"
-            - "--model-impl=vllm"
             - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
-            - "--port=8000"
             - "--data-parallel-size=4"
             - "--data-parallel-size-local=4"
             - "--data-parallel-multi-port-external-lb"
-            - "--data-parallel-rpc-port=5555"
             - "--enable-expert-parallel"
             - "--block-size=4096"
-            - "--max-model-len=204800"
             - "--max-num-batched-tokens=512"
-            - "--max-num-seqs=1"
             - "--kv-cache-dtype=fp8"
             - "--safetensors-load-strategy=prefetch"
-            - "--trust-remote-code"
             - "--enable-auto-tool-choice"
             - "--tool-call-parser=minimax_m2"
             - "--reasoning-parser=minimax_m2"
