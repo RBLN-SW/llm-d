@@ -39,6 +39,7 @@ This guide includes configurations for the following accelerator and model serve
 | Google TPU v5p | `tpu/v5p` | `Qwen/Qwen3-32B` | ✅ validated | — | GKE only · 3 replicas × 4 chips (`2x2x1`, TP=4) · `CONNECTOR=native`, `VARIANT=cpu` · nightly runs on Spot capacity |
 | Google TPU v6e | `tpu/v6` | `Qwen/Qwen3-32B` | 🟡 community | — | GKE only · 3 replicas × 8 chips (`2x4`, TP=8) · `CONNECTOR=native`, `VARIANT=cpu` · nightly moved to `tpu/v5p` while v6e capacity is unavailable |
 | Google TPU v7 | `tpu/v7` | `Qwen/Qwen3-32B` | 🟡 community | — | GKE only · 3 replicas × 4 chips (`2x2x1`, TP=8) · `CONNECTOR=native`, `VARIANT=cpu` · multi-host variant (`HOST_TYPE=multi-host`) serves `Qwen/Qwen3-Coder-480B-A35B-Instruct` |
+| Rebellions NPU | `npu` | `MiniMaxAI/MiniMax-M2.7` | 🟡 community | — | RBLN-CR series · 1 replica × 4 NPUs via DRA (one server per data-parallel rank, expert parallel) · `CONNECTOR=lmcache-connector`, `VARIANT=cpu` |
 
 ✅ validated: covered by a nightly E2E workflow · 🟡 community: maintained by the hardware vendor or community, not covered by nightly E2E · ❌ not supported: tracked in the linked issue · — no configuration.
 <!-- guide:support end -->
@@ -79,7 +80,7 @@ export GUIDE_NAME=tiered-prefix-cache
 export NAMESPACE=llm-d-tiered-prefix-cache
 export MONITORING=false # options: false, true
 export MONITORING_VALUES=
-export ACCELERATOR_TYPE=gpu # options: gpu, amd, xpu, tpu/v5p, tpu/v6, tpu/v7
+export ACCELERATOR_TYPE=gpu # options: gpu, amd, xpu, tpu/v5p, tpu/v6, tpu/v7, npu
 export MODEL_SERVER=vllm # options: vllm, sglang
 export CONNECTOR=native # options: native, lmcache-connector, mooncake-store; offloading implementation (table above)
 export VARIANT=cpu # options: cpu, fs; offload tier: cpu = CPU RAM, fs = CPU RAM + shared filesystem
@@ -150,6 +151,7 @@ export ROUTER_VALUES="${REPO_ROOT}/guides/${GUIDE_NAME}/router/${HOST_TYPE}/${GU
 > | NVIDIA or AMD vLLM `lmcache-connector` | 100 GiB × 2 ranks | 12800 |
 > | NVIDIA SGLang `native` (HiCache) | 200 GB × 2 ranks | 23800 |
 > | Intel XPU vLLM `lmcache-connector` (Qwen3-8B, 144 KiB per token) | 20 GiB | 2275 |
+> | Rebellions NPU vLLM `lmcache-connector` (MiniMax-M2.7, 124 KiB per token, 512-token router blocks, one endpoint per rank) | 50 GiB × 4 ranks | 825 per rank |
 >
 > For TPU, one CPU chunk is one KV block: multiply `TPU_OFFLOAD_NUM_CPU_CHUNKS` by the block size to get tokens. MooncakeStore uses one pool for all pods, so a per-pod value does not apply. The `multi-host` values are for Qwen3-Coder-480B on TPU v7.
 
@@ -184,6 +186,16 @@ export MONITORING_VALUES="-f ${REPO_ROOT}/guides/recipes/router/features/monitor
 </details>
 <!-- tabs:end -->
 
+**(Rebellions NPU only) Layer the NPU router values**, which list the four data-parallel rank ports and match prefixes in both tiers at the runtime's 512-token sub-block:
+
+<!-- guide:deploy.accelerator_values[0] start -->
+<!-- llm-d-cicd:skip start -->
+```bash
+export ACCELERATOR_VALUES="-f ${REPO_ROOT}/guides/${GUIDE_NAME}/router/single-host/npu.rbln.values.yaml"
+```
+<!-- llm-d-cicd:skip end -->
+<!-- guide:deploy.accelerator_values[0] end -->
+
 **Deploy the router** in [Standalone Mode](../../docs/architecture/router/proxy.md), with an Envoy sidecar in front of the router. The release name `${GUIDE_NAME}` is mandatory: the `InferencePool` selector matches a guide label that pairs with this release. To front the router with a Kubernetes Gateway instead, see Gateway Mode in the [Optimized Baseline](../optimized-baseline/README.md#1-deploy-the-llm-d-router).
 
 <!-- guide:deploy.standalone start -->
@@ -193,6 +205,7 @@ helm install ${GUIDE_NAME} \
   -f ${ROUTER_BASE_VALUES} \
   ${MONITORING_VALUES} \
   -f ${ROUTER_VALUES} \
+  ${ACCELERATOR_VALUES:-} \
   -n ${NAMESPACE} --version ${ROUTER_CHART_VERSION}
 ```
 <!-- guide:deploy.standalone end -->
