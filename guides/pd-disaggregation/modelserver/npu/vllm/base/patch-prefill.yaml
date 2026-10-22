@@ -48,7 +48,8 @@ spec:
                     - "--block-size=4096"
                     - "--max-num-batched-tokens=512"
                     - "--kv-cache-dtype=fp8"
-                    # Both roles must hash blocks alike, or decode cannot reuse the prefix cache prefill sends over NIXL.
+                    # Both roles must hash blocks alike, or decode cannot reuse the prefix cache prefill sends over NIXL;
+                    # sha256_cbor is the one that matches LMCache's hash.
                     - "--prefix-caching-hash-algo=sha256_cbor"
                     # Prefetching shortens the weight load.
                     - "--safetensors-load-strategy=prefetch"
