@@ -5,6 +5,13 @@
 - op: add
   path: /spec/template/spec/containers/0/args/-
   value: '{"kv_connector":"RBLNLMCacheConnectorV1","kv_role":"kv_both"}'
+# vLLM and LMCache hash prefix blocks with the same algorithm.
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: "--prefix-caching-hash-algo=sha256_cbor"
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: {name: LMCACHE_PRE_CACHING_HASH_ALGORITHM, value: sha256_cbor_64bit}
 - op: add
   path: /spec/template/spec/containers/0/env/-
   value: {name: LMCACHE_LOCAL_CPU, value: "True"}
